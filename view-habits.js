@@ -28,6 +28,9 @@ function renderHabits() {
   const today = new Date().toISOString().slice(0, 10);
   const todayDay = getTodayDayName();
 
+  // Debug: Log all habits with their reminder_time values
+  console.log('[renderHabits] All habits data:', JSON.stringify(habits.map(h => ({id: h.id, name: h.habit_name, reminder_time: h.reminder_time})), null, 2));
+
   // 1. Filter by Day
   if (_habitShowTodayOnly) {
     habits = habits.filter(h => isHabitScheduledToday(h));
@@ -98,20 +101,26 @@ function renderHabits() {
     // Parse Time (Handle 1899 date from Sheets)
     let displayTime = h.frequency || 'Daily';
     if (h.reminder_time) {
-      // If it's the specific Sheets base date (effectively null time), ignore it
-      if (String(h.reminder_time).startsWith('1899')) {
-        displayTime = h.frequency || 'Daily';
+      const rt = String(h.reminder_time);
+      // Handle Google Sheets datetime format: "1899-12-30T02:54:00"
+      if (rt.startsWith('1899-12-30T')) {
+        const timePart = rt.slice(11, 16); // Extract "02:54"
+        if (timePart.match(/^\d{2}:\d{2}$/)) {
+          displayTime = `@ ${timePart}`;
+        }
       }
-      // If it includes 'T', parse as ISO
-      else if (h.reminder_time.includes('T')) {
-        const dt = new Date(h.reminder_time);
-        const hours = String(dt.getHours()).padStart(2, '0');
-        const mins = String(dt.getMinutes()).padStart(2, '0');
-        displayTime = `@ ${hours}:${mins}`;
+      // Handle ISO format with T (not the 1899 format)
+      else if (rt.includes('T') && !rt.startsWith('1899')) {
+        const dt = new Date(rt);
+        if (!isNaN(dt.getTime())) {
+          const hours = String(dt.getHours()).padStart(2, '0');
+          const mins = String(dt.getMinutes()).padStart(2, '0');
+          displayTime = `@ ${hours}:${mins}`;
+        }
       }
       // Otherwise assume it's a simple time string like "10:00"
-      else {
-        displayTime = `@ ${h.reminder_time.slice(0, 5)}`;
+      else if (rt.match(/^\d{2}:\d{2}/)) {
+        displayTime = `@ ${rt.slice(0, 5)}`;
       }
     }
 
@@ -401,14 +410,29 @@ window.openHabitModal = function () {
 function parseReminderTimeToHHMM(val) {
   if (!val) return '';
   const s = String(val);
-  if (s.startsWith('1899') || s === '') return '';
+  
+  // Handle Google Sheets datetime format: "1899-12-30T02:54:00"
+  // The time portion is what we want
+  if (s.startsWith('1899-12-30T')) {
+    const timePart = s.slice(11, 16); // Extract "02:54" from "1899-12-30T02:54:00"
+    if (timePart.match(/^\d{2}:\d{2}$/)) {
+      return timePart;
+    }
+  }
+  
+  // Handle other ISO-like formats with T
   if (s.includes('T')) {
     const dt = new Date(s);
     if (isNaN(dt.getTime())) return '';
     return String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
   }
+  
   // Already HH:mm or HH:mm:ss
-  return s.slice(0, 5);
+  if (s.match(/^\d{2}:\d{2}/)) {
+    return s.slice(0, 5);
+  }
+  
+  return '';
 }
 
 window.openEditHabit = function (id) {

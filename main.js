@@ -819,11 +819,17 @@ document.addEventListener('click', async (e) => {
         const cat = document.getElementById('mHabitCat').value;
         const freq = document.getElementById('mHabitFreq').value;
         const days = typeof getSelectedDays === 'function' ? getSelectedDays('mHabitDays') : '';
+        
+        // Debug: find ALL elements with mHabitTime in the modal
+        const modal = document.getElementById('universalModal');
+        const allTimeInputs = modal ? modal.querySelectorAll('#mHabitTime') : [];
+        console.log('[Habit Save] All #mHabitTime elements in modal:', allTimeInputs.length, allTimeInputs);
+        
         const timeEl = document.getElementById('mHabitTime');
         const time = timeEl ? timeEl.value : '';
         const emoji = document.getElementById('mHabitEmoji')?.value || '✨';
 
-        console.log('[Habit Save] reminder_time input:', timeEl, 'value:', time);
+        console.log('[Habit Save] Current mHabitTime value:', time, 'element:', timeEl);
 
         if (!name) return;
         document.getElementById('universalModal').classList.add('hidden');
@@ -835,7 +841,7 @@ document.addEventListener('click', async (e) => {
             emoji: emoji,
             created_at: new Date().toISOString()
         };
-        console.log('[Habit Save] Sending payload:', habitPayload);
+        console.log('[Habit Save] Final payload:', habitPayload);
         await apiCall('create', 'habits', habitPayload);
         await refreshData('habits');
     }
@@ -1016,11 +1022,17 @@ document.addEventListener('click', async (e) => {
         const cat = document.getElementById('mHabitCat').value;
         const freq = document.getElementById('mHabitFreq').value;
         const days = typeof getSelectedDays === 'function' ? getSelectedDays('mHabitDays') : '';
+        
+        // Debug: find ALL elements with mHabitTime in the modal
+        const modal = document.getElementById('universalModal');
+        const allTimeInputs = modal ? modal.querySelectorAll('#mHabitTime') : [];
+        console.log('[Habit Update] All #mHabitTime elements in modal:', allTimeInputs.length, allTimeInputs);
+        
         const timeEl = document.getElementById('mHabitTime');
         const time = timeEl ? timeEl.value : '';
         const emoji = document.getElementById('mHabitEmoji')?.value || '✨';
 
-        console.log('[Habit Update] reminder_time input:', timeEl, 'value:', time);
+        console.log('[Habit Update] Current mHabitTime value:', time, 'element:', timeEl);
 
         if (!name) return;
         document.getElementById('universalModal').classList.add('hidden');
@@ -1031,7 +1043,7 @@ document.addEventListener('click', async (e) => {
             reminder_time: time,
             emoji: emoji
         };
-        console.log('[Habit Update] Sending payload:', updatePayload);
+        console.log('[Habit Update] Final payload:', updatePayload);
         await apiCall('update', 'habits', updatePayload, editId);
         await refreshData('habits');
     }
@@ -1171,6 +1183,11 @@ async function refreshData(viewContext) {
     try {
         const data = await apiCall('get', sheetName);
         state.data[stateKey] = data;
+        
+        // Debug: Log habits data after refresh
+        if (viewContext === 'habits') {
+            console.log('[Debug] Habits data from API:', JSON.stringify(data, null, 2));
+        }
 
         // If settings were refreshed, apply them immediately
         if (viewContext === 'settings' && typeof applySettings === 'function') {

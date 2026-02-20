@@ -60,6 +60,35 @@ function _getSearchValue() {
   return '';
 }
 
+// Helper to parse due_time from various formats to HH:mm for input field
+function parseDueTimeForInput(val) {
+  if (!val) return '';
+  const s = String(val);
+  
+  // Handle Google Sheets datetime format: "1899-12-30T14:30:00"
+  if (s.startsWith('1899-12-30T')) {
+    const timePart = s.slice(11, 16); // Extract "14:30"
+    if (timePart.match(/^\d{2}:\d{2}$/)) {
+      return timePart;
+    }
+  }
+  
+  // Handle ISO format with T
+  if (s.includes('T') && !s.startsWith('1899')) {
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime())) {
+      return String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+    }
+  }
+  
+  // Already HH:mm
+  if (s.match(/^\d{2}:\d{2}/)) {
+    return s.slice(0, 5);
+  }
+  
+  return '';
+}
+
 // ─────────────────────────────────────────────────────────
 //  MAIN RENDERER
 // ─────────────────────────────────────────────────────────
@@ -737,6 +766,7 @@ window.openEditTask = function (id) {
           <option value="P3" ${(!t.priority || t.priority === 'P3') ? 'selected' : ''}>● Low (P3)</option>
         </select>
         <input type="date" class="input" id="mTaskDate" value="${t.due_date || ''}">
+        <input type="time" class="input" id="mTaskTime" value="${parseDueTimeForInput(t.due_time)}">
       </div>
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Recurrence</label>

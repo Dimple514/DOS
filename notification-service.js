@@ -339,21 +339,35 @@ function checkAndTriggerReminders() {
     habits.forEach(habit => {
         if (!habit.reminder_time) return;
         const timeStr = String(habit.reminder_time);
-        // Skip invalid/null times from Sheets
-        if (timeStr.startsWith('1899') || timeStr === '') return;
-
+        
         let hours, minutes;
-        if (timeStr.includes('T')) {
-            const dt = new Date(timeStr);
-            hours = dt.getHours();
-            minutes = dt.getMinutes();
-        } else {
-            const parts = timeStr.split(':');
+        
+        // Handle Google Sheets datetime format: "1899-12-30T02:54:00"
+        if (timeStr.startsWith('1899-12-30T')) {
+            const timePart = timeStr.slice(11, 16); // Extract "02:54"
+            const parts = timePart.split(':');
             hours = parseInt(parts[0], 10);
             minutes = parseInt(parts[1], 10);
         }
+        // Handle other ISO formats with T
+        else if (timeStr.includes('T')) {
+            const dt = new Date(timeStr);
+            hours = dt.getHours();
+            minutes = dt.getMinutes();
+        }
+        // Simple time string like "02:54"
+        else if (timeStr.match(/^\d{2}:\d{2}/)) {
+            const parts = timeStr.split(':');
+            hours = parseInt(parts[0], 10);
+            minutes = parseInt(parts[1], 10);
+        } else {
+            return; // Invalid format
+        }
 
         if (isNaN(hours) || isNaN(minutes)) return;
+
+        // Debug log
+        console.log('[Habit Notification] Checking:', habit.habit_name, 'time:', hours + ':' + minutes, 'now:', now.getHours() + ':' + now.getMinutes());
 
         if (now.getHours() === hours && now.getMinutes() === minutes) {
             const triggeredKey = `habit_triggered_${habit.id}_${now.toDateString()}_${hours}_${minutes}`;
@@ -372,23 +386,52 @@ function checkAndTriggerReminders() {
     // Check tasks with due_date + due_time
     const tasks = state.data.tasks || [];
     tasks.forEach(task => {
-        if (!task.due_date || !task.due_time) return;
+        if (!task.due_date) return;
         if (task.status === 'completed') return;
 
-        try {
-            const taskDateTime = new Date(task.due_date + 'T' + task.due_time);
-            if (isNaN(taskDateTime.getTime())) return;
+        // Parse due_time from various formats
+        let hours = null, minutes = null;
+        const timeVal = String(task.due_time || '');
+        
+        if (timeVal.startsWith('1899-12-30T')) {
+            // Google Sheets datetime format
+            const timePart = timeVal.slice(11, 16);
+            if (timePart.match(/^\d{2}:\d{2}$/)) {
+                hours = parseInt(timePart.slice(0, 2), 10);
+                minutes = parseInt(timePart.slice(3, 5), 10);
+            }
+        } else if (timeVal.includes('T')) {
+            const dt = new Date(timeVal);
+            if (!isNaN(dt.getTime())) {
+                hours = dt.getHours();
+                minutes = dt.getMinutes();
+            }
+        } else if (timeVal.match(/^\d{2}:\d{2}/)) {
+            const parts = timeVal.split(':');
+            hours = parseInt(parts[0], 10);
+            minutes = parseInt(parts[1], 10);
+        }
+        
+        if (hours === null || minutes === null) return;
 
-            const diff = now - taskDateTime;
+        try {
+            // Construct the due datetime for today
+            const dueDate = new Date(task.due_date + 'T' + String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':00');
+            
+            // Debug log
+            console.log('[Task Notification] Checking:', task.title, 'due:', dueDate, 'now:', now);
+
+            // Check if it's due now (within 1 minute window)
+            const diff = now - dueDate;
             if (diff >= 0 && diff < 60000) {
-                const triggeredKey = `task_triggered_${task.id}_${taskDateTime.getTime()}`;
+                const triggeredKey = `task_triggered_${task.id}_${dueDate.getTime()}`;
                 if (!localStorage.getItem(triggeredKey)) {
                     localStorage.setItem(triggeredKey, 'true');
                     triggerReminderNotification({
                         id: 'task_' + task.id,
                         title: '📋 Task Due: ' + (task.title || 'Task'),
                         description: task.description || '',
-                        reminder_datetime: taskDateTime.toISOString()
+                        reminder_datetime: dueDate.toISOString()
                     });
                 }
             }
