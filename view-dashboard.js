@@ -716,21 +716,47 @@ function renderDashMainChart(expenses) {
   const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#4F46E5';
   const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border-color').trim() || '#e2e8f0';
 
-  const months = {};
+  // Daily data for the last 30 days
+  const days = {};
+  const today = new Date();
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  // Initialize all days in range with 0
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(thirtyDaysAgo);
+    d.setDate(d.getDate() + i);
+    const k = d.toISOString().slice(0, 10); // YYYY-MM-DD
+    days[k] = 0;
+  }
+  
+  // Fill in actual expense data
   expenses.forEach(e => {
     if (e.type !== 'expense') return;
     const d = new Date(e.date);
-    const k = d.toLocaleString('default', { month: 'short' });
-    months[k] = (months[k] || 0) + Number(e.amount);
+    if (d >= thirtyDaysAgo && d <= today) {
+      const k = d.toISOString().slice(0, 10);
+      if (days.hasOwnProperty(k)) {
+        days[k] = (days[k] || 0) + Number(e.amount);
+      }
+    }
   });
+
+  // Convert to chart format - show last 14 days for readability
+  const last14Days = Object.keys(days).slice(-14);
+  const labels = last14Days.map(d => {
+    const date = new Date(d);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  });
+  const data = last14Days.map(d => days[d]);
 
   _dashChartInstances.main = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: Object.keys(months),
+      labels: labels,
       datasets: [{
-        label: 'Expense', data: Object.values(months),
-        backgroundColor: primaryColor, borderRadius: 4, barThickness: 20
+        label: 'Daily Expense', data: data,
+        backgroundColor: primaryColor, borderRadius: 4, barThickness: 12
       }]
     },
     options: {
