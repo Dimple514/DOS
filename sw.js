@@ -1,13 +1,16 @@
-const CACHE_NAME = 'personal-os-v6';
+const CACHE_NAME = 'personal-os-v7';
 
 // Get the base path for GitHub Pages compatibility
 const BASE_PATH = self.location.pathname.replace('/sw.js', '');
 
+// Only include files that actually exist in the repository
 const ASSETS_TO_CACHE = [
     `${BASE_PATH}/`,
     `${BASE_PATH}/index.html`,
     `${BASE_PATH}/style.css`,
     `${BASE_PATH}/main.js`,
+    `${BASE_PATH}/manifest.json`,
+    // Views
     `${BASE_PATH}/view-dashboard.js`,
     `${BASE_PATH}/view-tasks.js`,
     `${BASE_PATH}/view-habits.js`,
@@ -16,33 +19,51 @@ const ASSETS_TO_CACHE = [
     `${BASE_PATH}/view-diary.js`,
     `${BASE_PATH}/view-vision.js`,
     `${BASE_PATH}/view-settings.js`,
-    `${BASE_PATH}/view-reminders.js`,
-    `${BASE_PATH}/notification-service.js`,
     `${BASE_PATH}/view-people.js`,
-    `${BASE_PATH}/manifest.json`
+    // Services
+    `${BASE_PATH}/notification-service.js`,
+    `${BASE_PATH}/ai-service.js`,
+    `${BASE_PATH}/fab-menu.js`,
+    // Components
+    `${BASE_PATH}/components/empty-state.js`,
+    // Styles
+    `${BASE_PATH}/styles/design-system.css`,
+    `${BASE_PATH}/styles/components.css`,
+    `${BASE_PATH}/loader.css`,
+    `${BASE_PATH}/settings-styles.css`,
+    `${BASE_PATH}/settings-data-styles.css`,
+    `${BASE_PATH}/settings-fab.css`,
+    `${BASE_PATH}/fab-menu-styles.css`,
+    `${BASE_PATH}/diary-views.css`,
+    `${BASE_PATH}/finance-transactions.css`,
+    `${BASE_PATH}/ui-polish.css`,
+    `${BASE_PATH}/vision-views.css`,
+    `${BASE_PATH}/vision-mobile.css`,
+    `${BASE_PATH}/saas-polish.css`,
+    `${BASE_PATH}/command-palette.css`
 ];
 
 self.addEventListener('install', (event) => {
-    console.log('[SW v6] Installing service worker...');
-    console.log('[SW v6] Base path:', BASE_PATH);
-    console.log('[SW v6] Full sw location:', self.location.href);
+    console.log('[SW v7] Installing service worker...');
+    console.log('[SW v7] Base path:', BASE_PATH);
+    console.log('[SW v7] Full sw location:', self.location.href);
     
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            console.log('[SW v6] Caching assets individually...');
+            console.log('[SW v7] Caching assets individually...');
             
             // Cache assets one by one to identify failures
             return Promise.all(
                 ASSETS_TO_CACHE.map((url) => {
                     return cache.add(url).then(() => {
-                        console.log('[SW v6] ✓ Cached:', url);
+                        console.log('[SW v7] ✓ Cached:', url);
                     }).catch((err) => {
-                        console.error('[SW v6] ✗ Failed to cache:', url, err);
+                        console.error('[SW v7] ✗ Failed to cache:', url, err);
                     });
                 })
             );
         }).then(() => {
-            console.log('[SW v6] Cache operation complete');
+            console.log('[SW v7] Cache operation complete');
             return self.skipWaiting();
         })
     );
@@ -57,19 +78,19 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-    console.log('[SW v6] Activating service worker...');
+    console.log('[SW v7] Activating service worker...');
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
                     if (cacheName !== CACHE_NAME) {
-                        console.log('[SW v6] Deleting old cache:', cacheName);
+                        console.log('[SW v7] Deleting old cache:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
             );
         }).then(() => {
-            console.log('[SW v6] Claiming clients...');
+            console.log('[SW v7] Claiming clients...');
             return self.clients.claim();
         })
     );
