@@ -1,6 +1,6 @@
 /* ========= CONFIG ========= */
 // Replace with your Apps Script Web App exec URL
-const API_BASE = "https://script.google.com/macros/s/AKfycbyVh03GaqsBpob7_q2o3bcqKDxmt6ZeiOUkZvnGORa_ZvbE7ePG3NZcbASCFGjWnENs/exec";
+const API_BASE = "https://script.google.com/macros/s/AKfycbwyN7SeCBiptEPil9ZlDRxQA33xcMMDSzSyCwRSNW_aja9d8OqjF73S2Twbe6zKMIbHaA/exec";
 
 /* Sheets used */
 const SHEETS = {
