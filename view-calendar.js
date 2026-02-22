@@ -35,7 +35,7 @@ function renderCalendar() {
                <button class="cal-btn ${calState.view === 'day' ? 'active' : ''}" onclick="switchCalView('day')">Day</button>
              </div>
              
-             <button class="btn primary" onclick="openEventModal()">+ Event</button>
+             <button class="btn primary" onclick="openEventModal()">+ Add Event</button>
           </div>
         </div>
 

@@ -609,6 +609,9 @@ document.addEventListener('click', async (e) => {
         const name = document.getElementById('mPersonName').value;
         const rel = document.getElementById('mPersonRel').value;
         const bday = document.getElementById('mPersonBday').value;
+        const nextInt = document.getElementById('mPersonNextInt').value;
+        const phone = document.getElementById('mPersonPhone')?.value || '';
+        const email = document.getElementById('mPersonEmail')?.value || '';
         const notes = document.getElementById('mPersonNotes').value;
 
         if (!name) return;
@@ -616,7 +619,8 @@ document.addEventListener('click', async (e) => {
         showToast("Adding person...");
 
         await apiCall('create', 'people', {
-            name: name, relationship: rel, birthday: bday, notes: notes,
+            name: name, relationship: rel, birthday: bday, next_interaction: nextInt,
+            phone: phone, email: email, notes: notes,
             created_at: new Date().toISOString()
         });
         await refreshData('people');
@@ -635,6 +639,7 @@ document.addEventListener('click', async (e) => {
         const type = document.getElementById('mTxType').value;
         const date = document.getElementById('mTxDate').value;
         const source = document.getElementById('mTxSource')?.value || '';
+        const notes = document.getElementById('mTxNote')?.value || '';
 
         if (!amt) return;
         document.getElementById('universalModal').classList.add('hidden');
@@ -645,7 +650,8 @@ document.addEventListener('click', async (e) => {
             category: cat,
             type: type,
             date: date,
-            source: source
+            source: source,
+            notes: notes
         });
 
         await refreshData('finance');
@@ -983,11 +989,12 @@ document.addEventListener('click', async (e) => {
         const type = document.getElementById('mTxType').value;
         const date = document.getElementById('mTxDate').value;
         const source = document.getElementById('mTxSource')?.value || '';
+        const notes = document.getElementById('mTxNote')?.value || '';
 
         if (!amt) return;
         document.getElementById('universalModal').classList.add('hidden');
         showToast("Updating transaction...");
-        await apiCall('update', 'expenses', { amount: amt, category: cat, type: type, date: date, source: source }, editId);
+        await apiCall('update', 'expenses', { amount: amt, category: cat, type: type, date: date, source: source, notes: notes }, editId);
         await refreshData('finance');
     }
 
@@ -1125,6 +1132,9 @@ document.addEventListener('click', async (e) => {
         const name = document.getElementById('mPersonName').value;
         const rel = document.getElementById('mPersonRel').value;
         const bday = document.getElementById('mPersonBday').value;
+        const nextInt = document.getElementById('mPersonNextInt').value;
+        const phone = document.getElementById('mPersonPhone')?.value || '';
+        const email = document.getElementById('mPersonEmail')?.value || '';
         const notes = document.getElementById('mPersonNotes').value;
 
         if (!name) return;
@@ -1132,7 +1142,8 @@ document.addEventListener('click', async (e) => {
         showToast("Updating person...");
 
         await apiCall('update', 'people', {
-            name: name, relationship: rel, birthday: bday, notes: notes
+            name: name, relationship: rel, birthday: bday, next_interaction: nextInt,
+            phone: phone, email: email, notes: notes
         }, editId);
         await refreshData('people');
     }
@@ -1251,8 +1262,8 @@ async function loadAllData() {
     updateLoader(5, 'Connecting...');
 
     // Include all sheets including settings, funds, and assets
-    const sheets = ['planner_events', 'tasks', 'expenses', 'habits', 'habit_logs', 'diary', 'vision_board', 'settings', 'funds', 'assets', 'people', 'reminders', 'vision_images'];
-    const keys = ['planner', 'tasks', 'expenses', 'habits', 'habit_logs', 'diary', 'vision', 'settings', 'funds', 'assets', 'people', 'reminders', 'vision_images'];
+    const sheets = ['planner_events', 'tasks', 'expenses', 'habits', 'habit_logs', 'diary', 'vision_board', 'settings', 'funds', 'assets', 'people', 'people_debts', 'reminders', 'vision_images'];
+    const keys = ['planner', 'tasks', 'expenses', 'habits', 'habit_logs', 'diary', 'vision', 'settings', 'funds', 'assets', 'people', 'people_debts', 'reminders', 'vision_images'];
 
     let loaded = 0;
     const total = sheets.length;

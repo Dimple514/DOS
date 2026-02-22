@@ -10,7 +10,12 @@ function renderFinance() {
     <div class="finance-wrapper">
       <div class="header-row">
         <h2 class="page-title">Finance</h2>
-        <button class="btn primary" onclick="openFinanceAction()">+ Add New</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn secondary" onclick="openFinanceCategoryManager()">
+            <i data-lucide="folder" style="width:14px;margin-right:4px;"></i>Categories
+          </button>
+          <button class="btn primary" onclick="openFinanceAction()">+ Add New</button>
+        </div>
       </div>
 
       <div class="fin-nav">
@@ -58,9 +63,9 @@ window.openFinanceAction = function () {
     // 1. TRANSACTION FORM
     const defaultType = finState === 'expenses' ? 'expense' : 'income';
 
-    // Categories
-    const expenseCats = ['Food', 'Transport', 'Rent', 'Utilities', 'Entertainment', 'Health', 'Shopping', 'Other'];
-    const incomeCats = ['Salary', 'Freelance', 'Business', 'Gift', 'Investment', 'Other'];
+    // Categories - use dynamic categories from settings
+    const cats = getFinanceCategories();
+    const allCats = getAllFinanceCategories();
 
     box.innerHTML = `
       <h3>New Transaction</h3>
@@ -77,7 +82,7 @@ window.openFinanceAction = function () {
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
           <input class="input" id="mTxCategory" placeholder="Category" list="catOptions">
           <datalist id="catOptions">
-              ${[...expenseCats, ...incomeCats].map(c => `<option value="${c}">`).join('')}
+              ${allCats.map(c => `<option value="${c}">`).join('')}
           </datalist>
 
           <select class="input" id="mTxSource" style="display:${defaultType === 'expense' ? 'block' : 'none'}">
@@ -330,11 +335,12 @@ function renderTransactionCard(tx) {
   const isIncome = tx.type === 'income';
 
   return `
-    <div class="transaction-card">
+    <div class="transaction-card" onclick="openEditTransaction('${tx.id}')" style="cursor:pointer;">
       <div class="transaction-date">${dateStr}</div>
       <div class="transaction-details">
         <div class="transaction-category">${tx.category || 'Uncategorized'}</div>
         <div style="font-size:10px; color:var(--text-muted)">${tx.source ? tx.source.toUpperCase() : (isIncome ? 'INCOME' : 'EXPENSE')}</div>
+        ${tx.notes ? `<div style="font-size:11px; color:var(--text-2); margin-top:4px; font-style:italic;">${tx.notes}</div>` : ''}
       </div>
       <div style="text-align:right">
           <div class="transaction-amount" style="color: ${isIncome ? 'var(--success)' : 'var(--danger)'}">
@@ -342,7 +348,7 @@ function renderTransactionCard(tx) {
           </div>
       </div>
       
-      <div style="display:flex; margin-left:10px">
+      <div style="display:flex; margin-left:10px" onclick="event.stopPropagation()">
         <button class="btn icon" onclick="openEditTransaction('${tx.id}')" title="Edit"><i data-lucide="pencil" style="width:14px"></i></button>
         <button class="btn icon" data-action="delete" data-sheet="expenses" data-id="${tx.id}"><i data-lucide="trash-2" style="width:14px"></i></button>
       </div>
@@ -413,10 +419,14 @@ window.openEditTransaction = function (id) {
   if (!tx) return;
   const modal = document.getElementById('universalModal');
   const box = modal.querySelector('.modal-box');
+  const categories = getAllFinanceCategories();
+  const expenseCats = categories.filter(c => !['Salary', 'Freelance', 'Business', 'Gift', 'Investment'].includes(c));
+  const incomeCats = categories.filter(c => ['Salary', 'Freelance', 'Business', 'Gift', 'Investment', 'Other'].includes(c));
+  
   box.innerHTML = `
     <h3>Edit Transaction</h3>
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px">
-      <select class="input" id="mTxType" style="margin:0">
+      <select class="input" id="mTxType" style="margin:0" onchange="toggleTxSourceVisibility(this.value)">
         <option value="expense" ${tx.type === 'expense' ? 'selected' : ''}>Expense</option>
         <option value="income" ${tx.type === 'income' ? 'selected' : ''}>Income</option>
       </select>
@@ -424,13 +434,17 @@ window.openEditTransaction = function (id) {
     </div>
     <input type="number" class="input" id="mTxAmount" placeholder="Amount" value="${tx.amount || ''}">
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-        <input class="input" id="mTxCategory" placeholder="Category" value="${(tx.category || '').replace(/"/g, '&quot;')}">
+        <input class="input" id="mTxCategory" placeholder="Category" list="editCatOptions" value="${(tx.category || '').replace(/"/g, '&quot;')}">
+        <datalist id="editCatOptions">
+            ${categories.map(c => `<option value="${c}">`).join('')}
+        </datalist>
         <select class="input" id="mTxSource" style="display:${tx.type === 'expense' ? 'block' : 'none'}">
               <option value="weekly" ${tx.source === 'weekly' ? 'selected' : ''}>Weekly Budget</option>
               <option value="monthly" ${tx.source === 'monthly' ? 'selected' : ''}>Monthly Bill</option>
               <option value="savings" ${tx.source === 'savings' ? 'selected' : ''}>Savings / One-off</option>
         </select>
     </div>
+    <input class="input" id="mTxNote" placeholder="Note (optional)" value="${(tx.notes || '').replace(/"/g, '&quot;')}">
 
     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
       <button class="btn" onclick="document.getElementById('universalModal').classList.add('hidden')">Cancel</button>
@@ -511,6 +525,165 @@ function exportFinanceCSV() {
   link.click();
   document.body.removeChild(link);
 }
+
+// ─────────────────────────────────────────────────────────
+// Finance Category CRUD Functions - Stored in Settings Sheet
+// ─────────────────────────────────────────────────────────
+
+// Default finance categories
+const DEFAULT_FINANCE_CATEGORIES = {
+  expense: ['Food', 'Transport', 'Rent', 'Utilities', 'Entertainment', 'Health', 'Shopping', 'Other'],
+  income: ['Salary', 'Freelance', 'Business', 'Gift', 'Investment', 'Other']
+};
+
+// Get categories from settings (synced with Google Sheets)
+function getFinanceCategories() {
+  const settings = state.data.settings?.[0] || {};
+  if (settings.finance_categories) {
+    try {
+      return JSON.parse(settings.finance_categories);
+    } catch (e) {}
+  }
+  return { ...DEFAULT_FINANCE_CATEGORIES };
+}
+
+// Save categories to settings (synced with Google Sheets)
+async function saveFinanceCategoriesToSettings(categories) {
+  const settings = state.data.settings?.[0] || {};
+  const newSettings = {
+    ...settings,
+    finance_categories: JSON.stringify(categories)
+  };
+  
+  // Update settings in the sheet
+  if (settings.id) {
+    await apiCall('update', 'settings', newSettings, settings.id);
+  } else {
+    await apiCall('create', 'settings', newSettings);
+  }
+  
+  // Update local state
+  if (!state.data.settings) state.data.settings = [{}];
+  state.data.settings[0] = newSettings;
+}
+
+// Get all categories (including from existing transactions)
+function getAllFinanceCategories() {
+  const savedCats = getFinanceCategories();
+  const txCats = (state.data.expenses || []).map(e => e.category).filter(Boolean);
+  return [...new Set([...savedCats.expense, ...savedCats.income, ...txCats])];
+}
+
+// Add a new category
+window.addFinanceCategory = async function(categoryName, type = 'expense') {
+  if (!categoryName || categoryName.trim() === '') return false;
+  const trimmed = categoryName.trim();
+  const categories = getFinanceCategories();
+  if (categories[type].includes(trimmed)) {
+    showToast('Category already exists');
+    return false;
+  }
+  categories[type].push(trimmed);
+  await saveFinanceCategoriesToSettings(categories);
+  showToast(`Category "${trimmed}" added`);
+  return true;
+};
+
+// Delete a category
+window.deleteFinanceCategory = async function(categoryName, type) {
+  const categories = getFinanceCategories();
+  categories[type] = categories[type].filter(c => c !== categoryName);
+  await saveFinanceCategoriesToSettings(categories);
+  showToast(`Category "${categoryName}" deleted`);
+};
+
+// Rename a category
+window.renameFinanceCategory = async function(oldName, newName, type) {
+  if (!newName || newName.trim() === '') return false;
+  const trimmed = newName.trim();
+  const categories = getFinanceCategories();
+  
+  if (categories[type].includes(trimmed) && trimmed !== oldName) {
+    showToast('Category name already exists');
+    return false;
+  }
+  
+  categories[type] = categories[type].map(c => c === oldName ? trimmed : c);
+  await saveFinanceCategoriesToSettings(categories);
+  showToast(`Category renamed to "${trimmed}"`);
+  return true;
+};
+
+// Open Finance Category Manager Modal
+window.openFinanceCategoryManager = function() {
+  const cats = getFinanceCategories();
+  const modal = document.getElementById('universalModal');
+  const box = modal.querySelector('.modal-box');
+  
+  box.innerHTML = `
+    <h3 style="margin-bottom:16px;">Manage Finance Categories</h3>
+    
+    <!-- Expense Categories -->
+    <div style="margin-bottom:20px;">
+      <h4 style="font-size:12px; color:var(--text-muted); text-transform:uppercase; margin-bottom:10px;">Expense Categories</h4>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input class="input" id="newExpenseCatInput" placeholder="New expense category" style="flex:1;">
+        <button class="btn primary small" onclick="saveNewFinanceCategory('expense')">Add</button>
+      </div>
+      <div style="max-height:150px;overflow-y:auto;">
+        ${cats.expense.map(cat => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border:1px solid var(--border-color);border-radius:6px;margin-bottom:4px;">
+            <span style="font-size:13px;">${cat}</span>
+            <button class="btn icon small" onclick="deleteFinanceCategoryWithRefresh('${cat}', 'expense')" title="Delete">
+              <i data-lucide="x" style="width:12px;"></i>
+            </button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    
+    <!-- Income Categories -->
+    <div style="margin-bottom:16px;">
+      <h4 style="font-size:12px; color:var(--text-muted); text-transform:uppercase; margin-bottom:10px;">Income Categories</h4>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input class="input" id="newIncomeCatInput" placeholder="New income category" style="flex:1;">
+        <button class="btn primary small" onclick="saveNewFinanceCategory('income')">Add</button>
+      </div>
+      <div style="max-height:150px;overflow-y:auto;">
+        ${cats.income.map(cat => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border:1px solid var(--border-color);border-radius:6px;margin-bottom:4px;">
+            <span style="font-size:13px;">${cat}</span>
+            <button class="btn icon small" onclick="deleteFinanceCategoryWithRefresh('${cat}', 'income')" title="Delete">
+              <i data-lucide="x" style="width:12px;"></i>
+            </button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+      <button class="btn" onclick="document.getElementById('universalModal').classList.add('hidden')">Close</button>
+    </div>
+  `;
+  
+  modal.classList.remove('hidden');
+  lucide.createIcons();
+};
+
+window.deleteFinanceCategoryWithRefresh = async function(categoryName, type) {
+  await deleteFinanceCategory(categoryName, type);
+  openFinanceCategoryManager(); // Refresh the modal
+};
+
+window.saveNewFinanceCategory = async function(type) {
+  const inputId = type === 'expense' ? 'newExpenseCatInput' : 'newIncomeCatInput';
+  const input = document.getElementById(inputId);
+  const name = input.value.trim();
+  if (await addFinanceCategory(name, type)) {
+    input.value = '';
+    openFinanceCategoryManager(); // Refresh the modal
+  }
+};
 
 window.renderFinance = renderFinance;
 // --- AI INSIGHT (FINANCE) ---

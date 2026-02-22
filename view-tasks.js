@@ -254,7 +254,12 @@ function renderTasks(filter = '') {
         <div>
           <h2 class="page-title">Tasks</h2>
         </div>
-        <button class="btn primary" onclick="openTaskModal()">+ Add Task</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn secondary" onclick="openCategoryManager()">
+            <i data-lucide="folder" style="width:14px;margin-right:4px;"></i>Categories
+          </button>
+          <button class="btn primary" onclick="openTaskModal()">+ Add Task</button>
+        </div>
       </div>
 
       <!-- ── STATS STRIP ── -->
@@ -440,14 +445,14 @@ function renderBentoTaskRow(t, isRecurring = false, dimmed = false) {
             ${t.title}
           </span>
           ${!_itemSelectionMode ? `
-          <div style="display:flex;align-items:center;gap:1px;flex-shrink:0;margin-top:-1px;" onclick="event.stopPropagation()">
-            <button class="btn icon" style="width:22px;height:22px;padding:2px;" onclick="openEditTask('${t.id}')" title="Edit">
+          <div style="display:flex;align-items:center;gap:1px;flex-shrink:0;margin-top:-1px;">
+            <button class="btn icon" style="width:22px;height:22px;padding:2px;" onclick="event.stopPropagation();openEditTask('${t.id}')" title="Edit">
               <i data-lucide="pencil" style="width:11px;"></i>
             </button>
-            <button class="btn icon" style="width:22px;height:22px;padding:2px;" onclick="addReminderToTask('${t.id}')" title="Remind me">
+            <button class="btn icon" style="width:22px;height:22px;padding:2px;" onclick="event.stopPropagation();addReminderToTask('${t.id}')" title="Remind me">
               <i data-lucide="bell" style="width:11px;"></i>
             </button>
-            <button class="btn icon" style="width:22px;height:22px;padding:2px;" data-action="delete" data-sheet="tasks" data-id="${t.id}" title="Delete">
+            <button class="btn icon" style="width:22px;height:22px;padding:2px;" onclick="event.stopPropagation();deleteTask('${t.id}')" title="Delete">
               <i data-lucide="trash-2" style="width:11px;"></i>
             </button>
             <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" style="width:13px;color:var(--text-muted);opacity:0.5;margin-left:1px;"></i>
@@ -655,7 +660,7 @@ window.toggleTaskOptimistic = async function (id) {
 window.openTaskModal = function () {
   const modal = document.getElementById('universalModal');
   const box = modal.querySelector('.modal-box');
-  const categories = ['Work', 'Personal', 'Health', 'Finance', 'Study', 'Other'];
+  const categories = getAllTaskCategories();
   box.innerHTML = `
     <h3>New Task</h3>
     <div style="display:flex;flex-direction:column;gap:10px;">
@@ -733,7 +738,7 @@ window.taskRecurrenceChanged = function () {
 window.openEditTask = function (id) {
   const t = state.data.tasks.find(x => String(x.id) === String(id));
   if (!t) return;
-  const categories = ['Work', 'Personal', 'Health', 'Finance', 'Study', 'Other'];
+  const categories = getAllTaskCategories();
   const isWeekly = t.recurrence === 'weekly';
   const isRecurring = t.recurrence && t.recurrence !== 'none';
   const selectedDays = t.recurrence_days ? t.recurrence_days.split(',').map(s => s.trim()) : [];
@@ -835,4 +840,187 @@ window.addReminderToTask = function(taskId) {
       }
     }, 100);
   }
+};
+
+// ─────────────────────────────────────────────────────────
+// Delete Task Function
+// ─────────────────────────────────────────────────────────
+window.deleteTask = async function(id) {
+  if (!confirm('Delete this task?')) return;
+  
+  try {
+    await apiCall('delete', 'tasks', {}, id);
+    showToast('Task deleted');
+    await refreshData('tasks');
+  } catch (err) {
+    console.error('Failed to delete task:', err);
+    showToast('Failed to delete task');
+  }
+};
+
+// ─────────────────────────────────────────────────────────
+// Category CRUD Functions - Stored in Settings Sheet
+// ─────────────────────────────────────────────────────────
+
+// Default categories - these can be extended by user
+const DEFAULT_TASK_CATEGORIES = ['Work', 'Personal', 'Health', 'Finance', 'Study', 'Other'];
+
+// Get categories from settings (synced with Google Sheets)
+function getTaskCategories() {
+  const settings = state.data.settings?.[0] || {};
+  if (settings.task_categories) {
+    try {
+      return JSON.parse(settings.task_categories);
+    } catch (e) {}
+  }
+  return [...DEFAULT_TASK_CATEGORIES];
+}
+
+// Save categories to settings (synced with Google Sheets)
+async function saveTaskCategoriesToSettings(categories) {
+  const settings = state.data.settings?.[0] || {};
+  const newSettings = {
+    ...settings,
+    task_categories: JSON.stringify(categories)
+  };
+  
+  // Update settings in the sheet
+  if (settings.id) {
+    await apiCall('update', 'settings', newSettings, settings.id);
+  } else {
+    await apiCall('create', 'settings', newSettings);
+  }
+  
+  // Update local state
+  if (!state.data.settings) state.data.settings = [{}];
+  state.data.settings[0] = newSettings;
+}
+
+// Get all categories (including from existing tasks)
+function getAllTaskCategories() {
+  const savedCats = getTaskCategories();
+  const taskCats = (state.data.tasks || []).map(t => t.category).filter(Boolean);
+  return [...new Set([...savedCats, ...taskCats])];
+}
+
+// Add a new category
+window.addTaskCategory = async function(categoryName) {
+  if (!categoryName || categoryName.trim() === '') return false;
+  const trimmed = categoryName.trim();
+  const categories = getTaskCategories();
+  if (categories.includes(trimmed)) {
+    showToast('Category already exists');
+    return false;
+  }
+  categories.push(trimmed);
+  await saveTaskCategoriesToSettings(categories);
+  showToast(`Category "${trimmed}" added`);
+  return true;
+};
+
+// Delete a category (tasks will become uncategorized)
+window.deleteTaskCategory = async function(categoryName) {
+  if (!confirm(`Delete category "${categoryName}"? Tasks will become uncategorized.`)) return;
+  
+  // Remove from categories list
+  const categories = getTaskCategories().filter(c => c !== categoryName);
+  await saveTaskCategoriesToSettings(categories);
+  
+  // Update all tasks with this category to have no category
+  const tasksToUpdate = state.data.tasks.filter(t => t.category === categoryName);
+  for (const t of tasksToUpdate) {
+    await apiCall('update', 'tasks', { ...t, category: '' }, t.id);
+  }
+  
+  showToast(`Category "${categoryName}" deleted`);
+  await refreshData('tasks');
+};
+
+// Rename a category
+window.renameTaskCategory = async function(oldName, newName) {
+  if (!newName || newName.trim() === '') return false;
+  const trimmed = newName.trim();
+  const categories = getTaskCategories();
+  
+  if (categories.includes(trimmed) && trimmed !== oldName) {
+    showToast('Category name already exists');
+    return false;
+  }
+  
+  // Update categories list
+  const newCategories = categories.map(c => c === oldName ? trimmed : c);
+  await saveTaskCategoriesToSettings(newCategories);
+  
+  // Update all tasks with this category
+  const tasksToUpdate = state.data.tasks.filter(t => t.category === oldName);
+  for (const t of tasksToUpdate) {
+    await apiCall('update', 'tasks', { ...t, category: trimmed }, t.id);
+  }
+  
+  showToast(`Category renamed to "${trimmed}"`);
+  await refreshData('tasks');
+  return true;
+};
+
+// Open Category Management Modal
+window.openCategoryManager = function() {
+  const categories = getAllTaskCategories();
+  const modal = document.getElementById('universalModal');
+  const box = modal.querySelector('.modal-box');
+  
+  box.innerHTML = `
+    <h3 style="margin-bottom:16px;">Manage Task Categories</h3>
+    
+    <!-- Add new category -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <input class="input" id="newCategoryInput" placeholder="New category name" style="flex:1;">
+      <button class="btn primary" onclick="saveNewCategory()">Add</button>
+    </div>
+    
+    <!-- Category list -->
+    <div style="max-height:300px;overflow-y:auto;">
+      ${categories.map(cat => `
+        <div class="category-item" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;margin-bottom:6px;">
+          <span style="font-weight:500;">${cat}</span>
+          <div style="display:flex;gap:4px;">
+            <button class="btn icon small" onclick="editCategoryName('${cat}')" title="Rename">
+              <i data-lucide="pencil" style="width:12px;"></i>
+            </button>
+            <button class="btn icon small" onclick="confirmDeleteCategory('${cat}')" title="Delete">
+              <i data-lucide="trash-2" style="width:12px;"></i>
+            </button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+      <button class="btn" onclick="document.getElementById('universalModal').classList.add('hidden')">Close</button>
+    </div>
+  `;
+  
+  modal.classList.remove('hidden');
+  lucide.createIcons();
+};
+
+window.saveNewCategory = async function() {
+  const input = document.getElementById('newCategoryInput');
+  const name = input.value.trim();
+  if (await addTaskCategory(name)) {
+    input.value = '';
+    openCategoryManager(); // Refresh the modal
+  }
+};
+
+window.editCategoryName = async function(oldName) {
+  const newName = prompt(`Rename category "${oldName}" to:`, oldName);
+  if (newName && newName !== oldName) {
+    await renameTaskCategory(oldName, newName);
+    openCategoryManager(); // Refresh the modal
+  }
+};
+
+window.confirmDeleteCategory = async function(categoryName) {
+  await deleteTaskCategory(categoryName);
+  document.getElementById('universalModal').classList.add('hidden');
 };
