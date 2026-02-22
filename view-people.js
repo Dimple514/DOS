@@ -317,6 +317,9 @@ function renderPeople() {
       </div>
     `;
     if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    document.querySelectorAll(".people-wrapper .person-card div[data-toggle-id]").forEach(el => {
+        el.onclick = function() { togglePersonCard(this.getAttribute("data-toggle-id")); };
+    });
 }
 
 window.switchPeopleView = function(view) {
@@ -432,7 +435,7 @@ function renderPersonCard(p, isExpanded = false) {
 
     return `
     <div class="card person-card" style="position:relative">
-       <div onclick="togglePersonCard('${p.id}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:4px;">
+       div data-toggle-id='${p.id}'('${p.id}')" style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:4px;">
            <div style="display:flex; gap:12px; align-items:center">
                <div class="avatar" style="width:40px; height:40px; border-radius:50%; background:var(--primary-soft); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:bold">
                    ${(p.name || '?').charAt(0).toUpperCase()}
